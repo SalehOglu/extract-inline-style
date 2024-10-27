@@ -1,0 +1,60 @@
+.wrapper {
+    text-align: center;
+    margin: 100px auto;
+    font-family: cursive;
+    max-width: 700px;
+    background: #F3F8FF;
+    padding: 50px;
+    border: 2px solid #8DA4F3;
+    border-radius: 8px;
+    form {
+        .fileupload {
+            position: relative;
+            display: inline-block;
+            input {
+                display: none;
+            }
+            label {
+                display: inline-block;
+                padding: 10px 20px;
+                background-color: #007bff;
+                color: white;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: background-color 0.3s;
+                &:hover {
+                    background-color: #0056b3;
+                }
+                &:active {
+                    background-color: #004085;
+                }
+            }
+        }
+        button {
+            color: #fff;
+            background-color: #8657b1;
+            padding: 10px 20px;
+            font-size: 18px;
+            margin: 35px auto;
+            display: block;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            &:hover {
+                opacity: 0.85;
+            }
+        }
+    }
+    .selected {
+        margin-top: 10px;
+        padding: 10px;
+        display: inline-block;
+        border-radius: 4px;
+        min-height: 20px;
+    }
+    #message {
+        color: crimson;
+        font-size: 20px;
+        max-width: 20px auto;
+    }
+}

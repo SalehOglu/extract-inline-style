@@ -3,69 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="src/css/style.css">
     <title>Extract inline style from HTML</title>
-	<style>
-		.wrapper {
-			text-align: center;
-			margin: 100px auto;
-			font-family: cursive;
-			max-width: 700px;
-		}
-		form button {
-			color: #fff;
-			background-color: #8657b1;
-			padding: 10px 20px;
-			font-size: 18px;
-			margin-bottom: 10px;
-			text-align: left;
-			border: none;
-			cursor: pointer;
-			border-radius: 10px;
-		}
-		form button:hover {
-			opacity: 0.85;
-		}
-		#message {
-			color: crimson;
-			font-size: 20px;
-			max-width: 20px auto;
-		}
-	</style>
 </head>
 <body>
 
-	<div class="wrapper">
-		<h1>Upload Your HTML File</h1>
-		<form id="uploadForm" enctype="multipart/form-data">
-			<input type="file" id="fileInput" accept=".html" multiple required>
-			<button type="submit">Convert</button>
-		</form>
-		<div id="message"></div>
-	</div>
+    <div class="wrapper">
+        <h1>Upload Your HTML Files</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="fileupload">
+                <input type="file" id="fileInput" class="file-input" accept=".html" multiple required/>
+                <label for="fileInput" class="fileLabel">Choose a file</label>
+            </div>
+            <div class="selected" id="selectedFiles">No files chosen</div>
+            <button type="submit">Convert</button>
+        </form>
+        <div id="message"></div>
+    </div>
 
     <script>
-        document.getElementById('uploadForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-
+        document.addEventListener('DOMContentLoaded', function() {
             const fileInput = document.getElementById('fileInput');
-            const formData = new FormData();
-            // formData.append('file', fileInput.files[0]);
+            const selectedFilesDiv = document.getElementById('selectedFiles');
 
-			// Loop through all selected files and append them to FormData
-            for (let i = 0; i < fileInput.files.length; i++) {
-                formData.append('files[]', fileInput.files[i]); // Use 'files[]' to indicate multiple files
-            }
+            document.getElementById('uploadForm').addEventListener('submit', function(event) {
+                event.preventDefault();
 
-            fetch('/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('message').textContent = data.message;
-            })
-            .catch(error => {
-                console.error('Error:', error);
+                const formData = new FormData();
+
+                // Loop through all selected files and append them to FormData
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    formData.append('files[]', fileInput.files[i]); // Use 'files[]' to indicate multiple files
+                }
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('message').textContent = data.message;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            });
+
+            // Update the div to show the selected file names
+            fileInput.addEventListener('change', function(event) {
+                const fileNames = Array.from(event.target.files).map(file => file.name).join(', ');
+                selectedFilesDiv.textContent = fileNames || 'No files chosen'; // Update the div with selected file names or reset to default
             });
         });
     </script>

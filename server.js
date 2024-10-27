@@ -178,6 +178,31 @@ const server = http.createServer((req, res) => {
     serveFile(res, path.join(__dirname, 'index.html'), 'text/html');
   } else if (req.method === 'POST' && req.url === '/upload') {
     handleFileUpload(req, res);
+  } else if (req.method === 'GET' && req.url.startsWith('/src/')) {
+    // Serve static files (CSS, JS, images, etc.)
+    const filePath = path.join(__dirname, req.url);
+    const ext = path.extname(filePath).toLowerCase();
+
+    let contentType = 'text/plain';
+    switch (ext) {
+        case '.css':
+            contentType = 'text/css';
+            break;
+        case '.js':
+            contentType = 'application/javascript';
+            break;
+        case '.png':
+            contentType = 'image/png';
+            break;
+        case '.jpg':
+            contentType = 'image/jpeg';
+            break;
+        case '.gif':
+            contentType = 'image/gif';
+            break;
+    }
+
+    serveFile(res, filePath, contentType);  
   } else {
     res.writeHead(404);
     res.end('404: Not Found');
