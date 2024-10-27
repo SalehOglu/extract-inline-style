@@ -6,55 +6,43 @@
   background: #F3F8FF;
   padding: 50px;
   border: 2px solid #8DA4F3;
-  border-radius: 8px;
-}
-.wrapper form .fileupload {
-  position: relative;
-  display: inline-block;
-}
-.wrapper form .fileupload input {
-  display: none;
-}
-.wrapper form .fileupload label {
-  display: inline-block;
-  padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-.wrapper form .fileupload label:hover {
-  background-color: #0056b3;
-}
-.wrapper form .fileupload label:active {
-  background-color: #004085;
-}
-.wrapper form button {
-  color: #fff;
-  background-color: #8657b1;
-  padding: 10px 20px;
-  font-size: 18px;
-  margin: 35px auto;
-  display: block;
-  border: none;
-  cursor: pointer;
-  border-radius: 5px;
-}
-.wrapper form button:hover {
-  opacity: 0.85;
-}
-.wrapper .selected {
-  margin-top: 10px;
-  padding: 10px;
-  display: inline-block;
-  border-radius: 4px;
-  min-height: 20px;
-}
-.wrapper #message {
-  color: crimson;
-  font-size: 20px;
-  max-width: 20px auto;
-}
-
-/*# sourceMappingURL=style.css.map */
+  border-radius: 8px; }
+  .wrapper form .fileupload {
+    position: relative;
+    display: inline-block; }
+    .wrapper form .fileupload input {
+      display: none; }
+    .wrapper form .fileupload label {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s; }
+      .wrapper form .fileupload label:hover {
+        background-color: #0056b3; }
+      .wrapper form .fileupload label:active {
+        background-color: #004085; }
+  .wrapper form button {
+    color: #fff;
+    background-color: #8657b1;
+    padding: 10px 20px;
+    font-size: 18px;
+    margin: 35px auto;
+    display: block;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px; }
+    .wrapper form button:hover {
+      opacity: 0.85; }
+  .wrapper .selected {
+    margin-top: 10px;
+    padding: 10px;
+    display: inline-block;
+    border-radius: 4px;
+    min-height: 20px; }
+  .wrapper #message {
+    color: crimson;
+    font-size: 20px;
+    max-width: 20px auto; }

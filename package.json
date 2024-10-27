@@ -4,7 +4,8 @@
   "description": "Extracting inline style from HTML code and exported it to a separated css file",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "scss": "node-sass --watch src/scss -o src/css --style"
   },
   "author": "Salehoglu",
   "license": "ISC",
