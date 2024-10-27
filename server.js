@@ -36,15 +36,12 @@ function parseMultipartData(req, boundary) {
 
     req.on('end', () => {
       const parts = body.split(`--${boundary}`);
-      // let fileData = null;
       const files = []; // Array to hold each file's data
 
       parts.forEach(part => {
         if (part.includes('Content-Disposition: form-data; name="files[]";')) {
-          // Extract the file data
           const headersEndIndex = part.indexOf('\r\n\r\n');
           const fileContent = part.substring(headersEndIndex + 4, part.lastIndexOf('\r\n'));
-          // fileData = fileContent;
           files.push(fileContent); // Add file data to array
         }
       });
@@ -58,6 +55,7 @@ function parseMultipartData(req, boundary) {
   });
 }
 
+
 // Handle file uploads and processing
 function handleFileUpload(req, res) {
   const contentType = req.headers['content-type'];
@@ -65,15 +63,17 @@ function handleFileUpload(req, res) {
 
   parseMultipartData(req, boundary)
     .then(files  => {
+      let mergedCssContent = ''; // To hold all merged CSS styles
+      const stylesMap = {}; // To store unique styles and their corresponding classes
+      let classCounter = 1; // Class name counter
+
       // Loop through each file and process it
       files.forEach((fileData, index) => {
         const html = fileData.toString('utf-8');
         const cleanHtml = html.replace(/�/g, ' ').trim();
         
         const $ = cheerio.load(cleanHtml);
-        let cssContent = '';
-        const stylesMap = {}; // To store unique styles and their corresponding classes
-        let classCounter = 1; // Class name counter
+        // let cssContent = '';
        
         // Remove empty elements or elements containing only &nbsp;
         $('*').each(function () {
@@ -115,14 +115,14 @@ function handleFileUpload(req, res) {
         // Extract inline styles and convert to classes
         $('[style]').each(function() {
           const inlineStyle = $(this).attr('style').trim();
-      
           let className;
+
           if (stylesMap[inlineStyle]) {
             className = stylesMap[inlineStyle];
           } else {
             className = `class-${classCounter++}`;
             stylesMap[inlineStyle] = className;
-            cssContent += `.${className} { ${inlineStyle} }\n`;
+            mergedCssContent += `.${className} { ${inlineStyle} }\n`;
           }
       
           $(this).removeAttr('style').addClass(className);
@@ -137,30 +137,30 @@ function handleFileUpload(req, res) {
           head.find('style').remove();
         }
   
-       // Ensure styles.css link is added
-       const cssFileName = `styles-${index + 1}.css`;
-       if (!$(`link[href="${cssFileName}"]`).length) {
-         head.append(`<link rel="stylesheet" href="${cssFileName}">`);
-       }
+       const mergedCssFileName = 'merged-styles.css';
+        if (!$(`link[href="${mergedCssFileName}"]`).length) {
+          head.append(`<link rel="stylesheet" href="${mergedCssFileName}">`);
+        }
         
         // Write the new HTML and extracted CSS to the output folder
         const htmlOutputPath = path.join(outputDir, `index-clean-${index + 1}.html`);
-        const cssOutputPath = path.join(outputDir, `styles-${index + 1}.css`);
 
         fs.writeFile(htmlOutputPath, $.html(), (err) => {
           if (err) {
             console.error('Error writing cleaned HTML:', err);
           }
         });
+
+        const mergedCssOutputPath = path.join(outputDir, 'merged-styles.css');
   
-        fs.writeFile(cssOutputPath, cssContent, (err) => {
+        fs.writeFile(mergedCssOutputPath, mergedCssContent, (err) => {
           if (err) {
-            console.error('Error writing CSS file:', err);
+            console.error('Error writing merged CSS file:', err);
           }
         });
   
-      // Respond with success message after all files are processed
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ message: 'File processed successfully!' }));
       })
 
