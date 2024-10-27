@@ -36,19 +36,21 @@ function parseMultipartData(req, boundary) {
 
     req.on('end', () => {
       const parts = body.split(`--${boundary}`);
-      let fileData = null;
+      // let fileData = null;
+      const files = []; // Array to hold each file's data
 
       parts.forEach(part => {
-        if (part.includes('Content-Disposition: form-data; name="file";')) {
+        if (part.includes('Content-Disposition: form-data; name="files[]";')) {
           // Extract the file data
           const headersEndIndex = part.indexOf('\r\n\r\n');
           const fileContent = part.substring(headersEndIndex + 4, part.lastIndexOf('\r\n'));
-          fileData = fileContent;
+          // fileData = fileContent;
+          files.push(fileContent); // Add file data to array
         }
       });
 
-      if (fileData) {
-        resolve(fileData);
+      if (files.length > 0) {
+        resolve(files); // Resolve with an array of files
       } else {
         reject('No file data found');
       }
@@ -62,112 +64,106 @@ function handleFileUpload(req, res) {
   const boundary = contentType.split('; ')[1].replace('boundary=', '');
 
   parseMultipartData(req, boundary)
-    .then(fileData => {
-      // Process the uploaded HTML content
-      const html = fileData.toString('utf-8');
-      const cleanHtml = html.replace(/�/g, ' ').trim();
+    .then(files  => {
+      // Loop through each file and process it
+      files.forEach((fileData, index) => {
+        const html = fileData.toString('utf-8');
+        const cleanHtml = html.replace(/�/g, ' ').trim();
+        
+        const $ = cheerio.load(cleanHtml);
+        let cssContent = '';
+        const stylesMap = {}; // To store unique styles and their corresponding classes
+        let classCounter = 1; // Class name counter
+       
+        // Remove empty elements or elements containing only &nbsp;
+        $('*').each(function () {
+          const htmlContent = $(this).html().trim();
+          if (!htmlContent || htmlContent === '&nbsp;') {
+            $(this).replaceWith(' '); // Replace with a space
+          }
+        });
 
-      const $ = cheerio.load(cleanHtml);
-      let cssContent = '';
-      const stylesMap = {}; // To store unique styles and their corresponding classes
-      let classCounter = 1; // Class name counter
-
-      // Remove empty elements or elements containing only &nbsp;
-      $('*').each(function () {
-        const htmlContent = $(this).html().trim();
-        if (!htmlContent || htmlContent === '&nbsp;') {
-          $(this).replaceWith(' '); // Replace with a space
+        // Merge consecutive <span> tags with the same attributes
+        $('span').each(function() {
+          const currentSpan = $(this);
+          const nextSpan = currentSpan.next('span');
+      
+          if (nextSpan.length && currentSpan.attr('style') === nextSpan.attr('style')) {
+            const currentHtml = currentSpan.html();
+            const nextHtml = nextSpan.html();
+      
+            // Check if nextHtml is empty or contains only whitespace
+            if (nextHtml.trim() === '' || nextHtml === '&nbsp;') {
+              if (currentHtml.trim() !== '') {
+                currentSpan.html(currentHtml + '&nbsp;'); // Add non-breaking space
+              }
+            } else {
+              const lastCharCurrent = currentHtml.slice(-1);
+              const firstCharNext = nextHtml.charAt(0);
+      
+              if (lastCharCurrent !== ' ' && lastCharCurrent !== '&nbsp;' && firstCharNext.trim() !== '') {
+                currentSpan.html(currentHtml + ' ' + nextHtml); // Add regular space
+              } else {
+                currentSpan.html(currentHtml + nextHtml);
+              }
+            }
+      
+            nextSpan.remove();
+          }
+        });
+  
+        // Extract inline styles and convert to classes
+        $('[style]').each(function() {
+          const inlineStyle = $(this).attr('style').trim();
+      
+          let className;
+          if (stylesMap[inlineStyle]) {
+            className = stylesMap[inlineStyle];
+          } else {
+            className = `class-${classCounter++}`;
+            stylesMap[inlineStyle] = className;
+            cssContent += `.${className} { ${inlineStyle} }\n`;
+          }
+      
+          $(this).removeAttr('style').addClass(className);
+        });
+  
+        // Ensure the <head> contains all the existing <link> and <script> tags
+        const head = $('head').length ? $('head') : $('<head></head>').prependTo('html');
+  
+        // Check if any <style> tags exist in the <head>
+        if (head.find('style').length) {
+          // Remove all existing <style> tags from the <head>
+          head.find('style').remove();
         }
-      });
+  
+       // Ensure styles.css link is added
+       const cssFileName = `styles-${index + 1}.css`;
+       if (!$(`link[href="${cssFileName}"]`).length) {
+         head.append(`<link rel="stylesheet" href="${cssFileName}">`);
+       }
+        
+        // Write the new HTML and extracted CSS to the output folder
+        const htmlOutputPath = path.join(outputDir, `index-clean-${index + 1}.html`);
+        const cssOutputPath = path.join(outputDir, `styles-${index + 1}.css`);
 
-  // Merge consecutive <span> tags with the same attributes
-  $('span').each(function() {
-    const currentSpan = $(this);
-    const nextSpan = currentSpan.next('span');
-
-    if (nextSpan.length && currentSpan.attr('style') === nextSpan.attr('style')) {
-      const currentHtml = currentSpan.html();
-      const nextHtml = nextSpan.html();
-    
-      // Check if nextHtml is empty or contains only whitespace
-      if (nextHtml.trim() === '' || nextHtml === '&nbsp;') {
-        // If nextHtml is empty, we can skip merging or add a space
-        if (currentHtml.trim() !== '') {
-          currentSpan.html(currentHtml + '&nbsp;'); // Add non-breaking space
-        }
-      } else {
-        // Determine if a space is needed before merging
-        const lastCharCurrent = currentHtml.slice(-1);
-        const firstCharNext = nextHtml.charAt(0);
-    
-        // Check if the last character of currentHtml is not a space
-        if (lastCharCurrent !== ' ' && lastCharCurrent !== '&nbsp;' && firstCharNext.trim() !== '') {
-          currentSpan.html(currentHtml + ' ' + nextHtml); // Add regular space
-        } else {
-          currentSpan.html(currentHtml + nextHtml); // Just merge without adding space
-        }
-      }
-
-      nextSpan.remove();
-    }
-  });
-
-      // Extract inline styles and convert to classes
-      $('[style]').each(function () {
-        const inlineStyle = $(this).attr('style').trim();
-
-        let className;
-        if (stylesMap[inlineStyle]) {
-          className = stylesMap[inlineStyle];
-        } else {
-          className = `class-${classCounter++}`;
-          stylesMap[inlineStyle] = className;
-
-          cssContent += `.${className} { ${inlineStyle} }\n`;
-        }
-
-        $(this).removeAttr('style').addClass(className);
-      });
-
-      // Ensure the <head> contains all the existing <link> and <script> tags
-      const head = $('head').length ? $('head') : $('<head></head>').prependTo('html');
-
-      // Check if any <style> tags exist in the <head>
-      if (head.find('style').length) {
-        // Remove all existing <style> tags from the <head>
-        head.find('style').remove();
-      }
-
-      // Check if styles.css is already included
-      if (!$('link[href="styles.css"]').length) {
-          head.append('<link rel="stylesheet" href="styles.css">');
-      }
-
-      // Write the new HTML to the output folder
-      const htmlOutputPath = path.join(outputDir, 'index-clean.html');
-      fs.writeFile(htmlOutputPath, $.html(), (err) => {
-        if (err) {
-          console.error('Error writing cleaned HTML:', err);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ message: 'Error processing file' }));
-          return;
-        }
-      });
-
-      // Write the extracted CSS to the output folder
-      const cssOutputPath = path.join(outputDir, 'styles.css');
-      fs.writeFile(cssOutputPath, cssContent, (err) => {
-        if (err) {
-          console.error('Error writing CSS file:', err);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ message: 'Error processing file' }));
-          return;
-        }
-      });
-
-      // Respond with a success message
+        fs.writeFile(htmlOutputPath, $.html(), (err) => {
+          if (err) {
+            console.error('Error writing cleaned HTML:', err);
+          }
+        });
+  
+        fs.writeFile(cssOutputPath, cssContent, (err) => {
+          if (err) {
+            console.error('Error writing CSS file:', err);
+          }
+        });
+  
+      // Respond with success message after all files are processed
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ message: 'File processed successfully!' }));
+        res.end(JSON.stringify({ message: 'File processed successfully!' }));
+      })
+
     })
     .catch(err => {
       console.error('Error parsing file:', err);

@@ -37,7 +37,7 @@
 	<div class="wrapper">
 		<h1>Upload Your HTML File</h1>
 		<form id="uploadForm" enctype="multipart/form-data">
-			<input type="file" id="fileInput" accept=".html" required>
+			<input type="file" id="fileInput" accept=".html" multiple required>
 			<button type="submit">Convert</button>
 		</form>
 		<div id="message"></div>
@@ -49,7 +49,12 @@
 
             const fileInput = document.getElementById('fileInput');
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            // formData.append('file', fileInput.files[0]);
+
+			// Loop through all selected files and append them to FormData
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('files[]', fileInput.files[i]); // Use 'files[]' to indicate multiple files
+            }
 
             fetch('/upload', {
                 method: 'POST',
