@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extract inline style from HTML</title>
+	<style>
+		.wrapper {
+			text-align: center;
+			margin: 100px auto;
+			font-family: cursive;
+			max-width: 700px;
+		}
+		form button {
+			color: #fff;
+			background-color: #8657b1;
+			padding: 10px 20px;
+			font-size: 18px;
+			margin-bottom: 10px;
+			text-align: left;
+			border: none;
+			cursor: pointer;
+			border-radius: 10px;
+		}
+		form button:hover {
+			opacity: 0.85;
+		}
+		#message {
+			color: crimson;
+			font-size: 20px;
+			max-width: 20px auto;
+		}
+	</style>
+</head>
+<body>
+
+	<div class="wrapper">
+		<h1>Upload Your HTML File</h1>
+		<form id="uploadForm" enctype="multipart/form-data">
+			<input type="file" id="fileInput" accept=".html" required>
+			<button type="submit">Convert</button>
+		</form>
+		<div id="message"></div>
+	</div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const fileInput = document.getElementById('fileInput');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('message').textContent = data.message;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+    </script>
+</body>
+</html>

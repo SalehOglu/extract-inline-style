@@ -1,0 +1,16 @@
+{
+  "name": "extract-inline-style-from-html",
+  "version": "1.0.0",
+  "description": "Extracting inline style from HTML code and exported it to a separated css file",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Salehoglu",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.10",
+    "open": "^7.4.2",
+    "parse5": "^5.0.0"
+  }
+}
