@@ -10,13 +10,16 @@
 
     <div class="wrapper">
         <h1>Upload Your HTML Files</h1>
+        <img src="/src/imgs/upload.png" alt="Icon"/>
         <form id="uploadForm" enctype="multipart/form-data">
             <div class="fileupload">
                 <input type="file" id="fileInput" class="file-input" accept=".html" multiple required/>
                 <label for="fileInput" class="fileLabel">Choose a file</label>
             </div>
-            <div class="selected" id="selectedFiles">No files chosen</div>
-            <button type="submit">Convert</button>
+            <div class="selected" id="selectedFiles">
+                <span>No files chosen</span>
+            </div>
+            <button id="submitBtn" type="submit">Convert</button>
         </form>
         <div id="message"></div>
     </div>
@@ -25,9 +28,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             const fileInput = document.getElementById('fileInput');
             const selectedFilesDiv = document.getElementById('selectedFiles');
+            const convertButton = document.getElementById('submitBtn');
+
 
             document.getElementById('uploadForm').addEventListener('submit', function(event) {
                 event.preventDefault();
+
+                convertButton.textContent = 'Converting..';
+                convertButton.classList.add("loading");
 
                 const formData = new FormData();
 
@@ -43,6 +51,9 @@
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('message').textContent = data.message;
+                    // Reset button text and state on success
+                    convertButton.textContent = 'Convert';
+                    convertButton.classList.remove("loading");
                 })
                 .catch(error => {
                     console.error('Error:', error);
@@ -53,6 +64,14 @@
             fileInput.addEventListener('change', function(event) {
                 const fileNames = Array.from(event.target.files).map(file => file.name).join(', ');
                 selectedFilesDiv.textContent = fileNames || 'No files chosen'; // Update the div with selected file names or reset to default
+
+                // Show the convert button only if files are selected
+                if (fileInput.files.length > 0) {
+                    convertButton.style.display = 'block';
+                } else {
+                    convertButton.style.display = 'none';
+                }
+                
             });
         });
     </script>

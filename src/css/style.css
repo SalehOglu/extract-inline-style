@@ -7,6 +7,9 @@
   padding: 50px;
   border: 2px solid #8DA4F3;
   border-radius: 8px; }
+  @media (max-width: 600px) {
+    .wrapper {
+      padding: 50px 20px; } }
   .wrapper form .fileupload {
     position: relative;
     display: inline-block; }
@@ -24,7 +27,7 @@
         background-color: #0056b3; }
       .wrapper form .fileupload label:active {
         background-color: #004085; }
-  .wrapper form button {
+  .wrapper form #submitBtn {
     color: #fff;
     background-color: #8657b1;
     padding: 10px 20px;
@@ -33,8 +36,14 @@
     display: block;
     border: none;
     cursor: pointer;
-    border-radius: 5px; }
-    .wrapper form button:hover {
+    border-radius: 5px;
+    display: none;
+    transition: all 0.3s ease-in-out;
+    transition-behavior: allow-discrete; }
+    .wrapper form #submitBtn:hover {
+      opacity: 0.85; }
+    .wrapper form #submitBtn.loading {
+      pointer-events: none;
       opacity: 0.85; }
   .wrapper .selected {
     margin-top: 10px;
@@ -45,4 +54,4 @@
   .wrapper #message {
     color: crimson;
     font-size: 20px;
-    max-width: 20px auto; }
+    margin: 20px auto; }
