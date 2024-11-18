@@ -142,6 +142,9 @@ function handleFileUpload(req, res) {
           head.append(`<link rel="stylesheet" href="${mergedCssFileName}">`);
         }
         
+        // Convert pt to px in merged CSS content
+        const finalCssContent = convertPtToPx(mergedCssContent);
+
         // Write the new HTML and extracted CSS to the output folder
         const htmlOutputPath = path.join(outputDir, `index-clean-${index + 1}.html`);
 
@@ -152,8 +155,10 @@ function handleFileUpload(req, res) {
         });
 
         const mergedCssOutputPath = path.join(outputDir, 'merged-styles.css');
+
+
   
-        fs.writeFile(mergedCssOutputPath, mergedCssContent, (err) => {
+        fs.writeFile(mergedCssOutputPath, finalCssContent, (err) => {
           if (err) {
             console.error('Error writing merged CSS file:', err);
           }
@@ -208,6 +213,15 @@ const server = http.createServer((req, res) => {
     res.end('404: Not Found');
   }
 });
+
+// Function to convert pt to px
+function convertPtToPx(cssContent) {
+  return cssContent.replace(/(\d*\.?\d+)\s*pt/g, (match, p1) => {
+      const ptValue = parseFloat(p1);
+      const pxValue = Math.round(ptValue * 1.333); // Convert pt to px
+      return `${pxValue}px`; // Return the new value with px
+  });
+}
 
 // Start the server
 const PORT = 3001;
