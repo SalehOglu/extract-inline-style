@@ -9,19 +9,21 @@
 <body>
 
     <div class="wrapper">
-        <h1>Upload Your HTML Files</h1>
-        <img src="/src/imgs/upload.png" alt="Icon"/>
-        <form id="uploadForm" enctype="multipart/form-data">
-            <div class="fileupload">
-                <input type="file" id="fileInput" class="file-input" accept=".html" multiple required/>
-                <label for="fileInput" class="fileLabel">Choose a file</label>
-            </div>
-            <div class="selected" id="selectedFiles">
-                <span>No files chosen</span>
-            </div>
-            <button id="submitBtn" type="submit">Convert</button>
-        </form>
-        <div id="message"></div>
+        <div class="inner">
+            <h1>Upload Your HTML Files</h1>
+            <img src="/src/imgs/upload.png" alt="Icon"/>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="fileupload">
+                    <input type="file" id="fileInput" class="file-input" accept=".html" multiple required/>
+                    <label for="fileInput" class="fileLabel">Choose a file</label>
+                </div>
+                <div class="selected" id="selectedFiles">
+                    <span>No files chosen</span>
+                </div>
+                <button id="submitBtn" type="submit">Convert</button>
+            </form>
+            <div id="message"></div>
+        </div>
     </div>
 
     <script>
@@ -50,7 +52,9 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('message').textContent = data.message;
+                    let msg = document.getElementById('message');
+                    msg.textContent = data.message;
+                    msg.classList.add("active");
                     // Reset button text and state on success
                     convertButton.textContent = 'Convert';
                     convertButton.classList.remove("loading");

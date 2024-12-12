@@ -1,15 +1,23 @@
+body {
+  background: linear-gradient(to bottom, #6D59D4 50%, #EDF3FF 50%);
+  background-repeat: no-repeat; }
+
 .wrapper {
   text-align: center;
   margin: 100px auto;
-  font-family: cursive;
-  max-width: 700px;
+  font-family: sans-serif;
+  max-width: 520px;
   background: #F3F8FF;
-  padding: 50px;
-  border: 2px solid #8DA4F3;
-  border-radius: 8px; }
-  @media (max-width: 600px) {
-    .wrapper {
-      padding: 50px 20px; } }
+  padding: 10px;
+  border: 1px solid #DADBDB;
+  border-radius: 10px; }
+  .wrapper .inner {
+    background: #EDF3FF;
+    padding: 50px;
+    border: 1px solid #DADBDB; }
+    @media (max-width: 600px) {
+      .wrapper .inner {
+        padding: 50px 20px; } }
   .wrapper form .fileupload {
     position: relative;
     display: inline-block; }
@@ -17,10 +25,10 @@
       display: none; }
     .wrapper form .fileupload label {
       display: inline-block;
-      padding: 10px 20px;
-      background-color: #007bff;
+      padding: 7px 30px;
+      background-color: #0052EF;
       color: white;
-      border-radius: 5px;
+      border-radius: 20px;
       cursor: pointer;
       transition: background-color 0.3s; }
       .wrapper form .fileupload label:hover {
@@ -30,13 +38,13 @@
   .wrapper form #submitBtn {
     color: #fff;
     background-color: #8657b1;
-    padding: 10px 20px;
+    padding: 8px 20px;
     font-size: 18px;
     margin: 35px auto;
     display: block;
     border: none;
     cursor: pointer;
-    border-radius: 5px;
+    border-radius: 25px;
     display: none;
     transition: all 0.3s ease-in-out;
     transition-behavior: allow-discrete; }
@@ -52,6 +60,24 @@
     border-radius: 4px;
     min-height: 20px; }
   .wrapper #message {
-    color: crimson;
+    color: #88c941;
     font-size: 20px;
-    margin: 20px auto; }
+    margin: 20px auto;
+    position: relative;
+    padding-left: 25px;
+    max-width: max-content;
+    text-align: left;
+    display: none; }
+    .wrapper #message.active {
+      display: block; }
+    .wrapper #message::before {
+      content: "";
+      position: absolute;
+      top: 1px;
+      left: 0;
+      width: 20px;
+      height: 20px;
+      background: url("../imgs/tick-mark.png");
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center; }

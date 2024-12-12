@@ -156,17 +156,14 @@ function handleFileUpload(req, res) {
 
         const mergedCssOutputPath = path.join(outputDir, 'merged-styles.css');
 
-
-  
         fs.writeFile(mergedCssOutputPath, finalCssContent, (err) => {
           if (err) {
             console.error('Error writing merged CSS file:', err);
           }
         });
-  
-        
+          
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ message: 'File processed successfully!' }));
+        res.end(JSON.stringify({ message: 'Your file has been  successfully converted!' }));
       })
 
     })
