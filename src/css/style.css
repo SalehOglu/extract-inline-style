@@ -58,7 +58,9 @@ body {
     padding: 10px;
     display: inline-block;
     border-radius: 4px;
-    min-height: 20px; }
+    min-height: 20px;
+    font-size: 14px;
+    color: gray; }
   .wrapper #message {
     color: #88c941;
     font-size: 20px;
