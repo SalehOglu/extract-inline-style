@@ -161,9 +161,14 @@ function handleFileUpload(req, res) {
             console.error('Error writing merged CSS file:', err);
           }
         });
-          
+        
+        // Send the URL of the cleaned HTML file back to the client  
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ message: 'Your file has been  successfully converted!' }));
+        res.end(JSON.stringify({ 
+          message: 'Your file has been successfully converted!',
+          downloadHtmlUrl: `/output/index-clean-${index + 1}.html`,
+          downloadCssUrl: `/output/merged-styles.css`,
+        }));
       })
 
     })
@@ -205,7 +210,23 @@ const server = http.createServer((req, res) => {
     }
 
     serveFile(res, filePath, contentType);  
-  } else {
+  } else if (req.method === 'GET' && req.url.startsWith('/output/')) {
+    // Serve output files (cleaned HTML, CSS, etc.)
+    const filePath = path.join(__dirname, req.url);
+    const ext = path.extname(filePath).toLowerCase();
+
+    let contentType = 'text/plain';
+    switch (ext) {
+        case '.html':
+            contentType = 'text/html';
+            break;
+        case '.css':
+            contentType = 'text/css';
+            break;
+    }
+
+    serveFile(res, filePath, contentType);  
+} else {
     res.writeHead(404);
     res.end('404: Not Found');
   }

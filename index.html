@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" type="text/css" href="src/css/style.css">
+    <link rel="shortcut icon" type="image/x-icon" href="/src/imgs/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="/src/css/style.css">
     <title>Extract inline style from HTML</title>
 </head>
 <body>
@@ -23,6 +24,10 @@
                 <button id="submitBtn" type="submit">Convert</button>
             </form>
             <div id="message"></div>
+            <div id="downloadLinkContainer" style="display: none;">
+                <a id="downloadHtmlLink" href="#" download>Download Cleaned HTML</a>
+                <a id="downloadCssLink" href="#" download>Download Merged CSS</a>
+            </div>
         </div>
     </div>
 
@@ -55,6 +60,20 @@
                     let msg = document.getElementById('message');
                     msg.textContent = data.message;
                     msg.classList.add("active");
+                    // Show the download link
+                    if (data.downloadHtmlUrl && data.downloadCssUrl) {
+            console.log("Download URLs received:", data.downloadHtmlUrl, data.downloadCssUrl); // Debug
+            const downloadLinkContainer = document.getElementById('downloadLinkContainer');
+            const downloadHtmlLink = document.getElementById('downloadHtmlLink');
+            const downloadCssLink = document.getElementById('downloadCssLink');
+
+            downloadHtmlLink.href = data.downloadHtmlUrl;
+            downloadCssLink.href = data.downloadCssUrl;
+            downloadLinkContainer.style.display = 'block';
+        } else {
+            console.log("Download URLs missing in response"); // Debug
+        }
+
                     // Reset button text and state on success
                     convertButton.textContent = 'Convert';
                     convertButton.classList.remove("loading");

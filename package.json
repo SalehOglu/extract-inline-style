@@ -2,9 +2,9 @@
   "name": "extract-inline-style-from-html",
   "version": "1.0.0",
   "description": "Extracting inline style from HTML code and exported it to a separated css file",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node server.js",
     "scss": "node-sass --watch src/scss -o src/css --style"
   },
   "author": "Salehoglu",
