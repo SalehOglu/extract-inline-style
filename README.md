@@ -4,8 +4,6 @@ This steps for extracting the inline style from HTML document to a separated CSS
 
 * For development (with auto-restart on file changes):
     `npm run dev` 
-* For production:
-    `npm start` 
     
 * Watch for changes in the SCSS directory and compile to CSS directory:  `.\watch.bat`
 
