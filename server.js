@@ -4,7 +4,6 @@ const path = require('path');
 const cheerio = require('cheerio');
 const open = require('open');
 
-
 // Define the output folder path relative to the script's location
 const outputDir = path.join(__dirname, 'output');
 
@@ -36,18 +35,18 @@ function parseMultipartData(req, boundary) {
 
     req.on('end', () => {
       const parts = body.split(`--${boundary}`);
-      const files = []; // Array to hold each file's data
+      const files = [];
 
       parts.forEach(part => {
         if (part.includes('Content-Disposition: form-data; name="files[]";')) {
           const headersEndIndex = part.indexOf('\r\n\r\n');
           const fileContent = part.substring(headersEndIndex + 4, part.lastIndexOf('\r\n'));
-          files.push(fileContent); // Add file data to array
+          files.push(fileContent);
         }
       });
 
       if (files.length > 0) {
-        resolve(files); // Resolve with an array of files
+        resolve(files);
       } else {
         reject('No file data found');
       }
@@ -55,31 +54,29 @@ function parseMultipartData(req, boundary) {
   });
 }
 
-
 // Handle file uploads and processing
 function handleFileUpload(req, res) {
   const contentType = req.headers['content-type'];
   const boundary = contentType.split('; ')[1].replace('boundary=', '');
 
   parseMultipartData(req, boundary)
-    .then(files  => {
-      let mergedCssContent = ''; // To hold all merged CSS styles
-      const stylesMap = {}; // To store unique styles and their corresponding classes
-      let classCounter = 1; // Class name counter
+    .then(files => {
+      let mergedCssContent = '';
+      const stylesMap = {};
+      let classCounter = 1;
+      const outputFiles = [];
 
-      // Loop through each file and process it
       files.forEach((fileData, index) => {
         const html = fileData.toString('utf-8');
         const cleanHtml = html.replace(/�/g, ' ').trim();
         
         const $ = cheerio.load(cleanHtml);
-        // let cssContent = '';
-       
+
         // Remove empty elements or elements containing only &nbsp;
         $('*').each(function () {
           const htmlContent = $(this).html().trim();
           if (!htmlContent || htmlContent === '&nbsp;') {
-            $(this).replaceWith(' '); // Replace with a space
+            $(this).replaceWith(' ');
           }
         });
 
@@ -92,17 +89,16 @@ function handleFileUpload(req, res) {
             const currentHtml = currentSpan.html();
             const nextHtml = nextSpan.html();
       
-            // Check if nextHtml is empty or contains only whitespace
             if (nextHtml.trim() === '' || nextHtml === '&nbsp;') {
               if (currentHtml.trim() !== '') {
-                currentSpan.html(currentHtml + '&nbsp;'); // Add non-breaking space
+                currentSpan.html(currentHtml + '&nbsp;');
               }
             } else {
               const lastCharCurrent = currentHtml.slice(-1);
               const firstCharNext = nextHtml.charAt(0);
       
               if (lastCharCurrent !== ' ' && lastCharCurrent !== '&nbsp;' && firstCharNext.trim() !== '') {
-                currentSpan.html(currentHtml + ' ' + nextHtml); // Add regular space
+                currentSpan.html(currentHtml + ' ' + nextHtml);
               } else {
                 currentSpan.html(currentHtml + nextHtml);
               }
@@ -131,46 +127,44 @@ function handleFileUpload(req, res) {
         // Ensure the <head> contains all the existing <link> and <script> tags
         const head = $('head').length ? $('head') : $('<head></head>').prependTo('html');
   
-        // Check if any <style> tags exist in the <head>
-        if (head.find('style').length) {
-          // Remove all existing <style> tags from the <head>
-          head.find('style').remove();
-        }
+        // Remove all existing <style> tags from the <head>
+        head.find('style').remove();
   
-       const mergedCssFileName = 'merged-styles.css';
+        const mergedCssFileName = 'merged-styles.css';
         if (!$(`link[href="${mergedCssFileName}"]`).length) {
           head.append(`<link rel="stylesheet" href="${mergedCssFileName}">`);
         }
         
-        // Convert pt to px in merged CSS content
-        const finalCssContent = convertPtToPx(mergedCssContent);
-
-        // Write the new HTML and extracted CSS to the output folder
+        // Write the new HTML
         const htmlOutputPath = path.join(outputDir, `index-clean-${index + 1}.html`);
+        try {
+          fs.writeFileSync(htmlOutputPath, $.html());
+          console.log(`Wrote HTML file: ${htmlOutputPath}`);
+          outputFiles.push(`output/index-clean-${index + 1}.html`);
+        } catch (err) {
+          console.error(`Error writing HTML file ${htmlOutputPath}:`, err);
+        }
+      });
 
-        fs.writeFile(htmlOutputPath, $.html(), (err) => {
-          if (err) {
-            console.error('Error writing cleaned HTML:', err);
-          }
-        });
+      // Convert pt to px in merged CSS content
+      const finalCssContent = convertPtToPx(mergedCssContent);
 
-        const mergedCssOutputPath = path.join(outputDir, 'merged-styles.css');
+      // Write the merged CSS file
+      const mergedCssOutputPath = path.join(outputDir, 'merged-styles.css');
+      try {
+        fs.writeFileSync(mergedCssOutputPath, finalCssContent);
+        console.log(`Wrote CSS file: ${mergedCssOutputPath}`);
+        outputFiles.push('output/merged-styles.css');
+      } catch (err) {
+        console.error(`Error writing CSS file ${mergedCssOutputPath}:`, err);
+      }
 
-        fs.writeFile(mergedCssOutputPath, finalCssContent, (err) => {
-          if (err) {
-            console.error('Error writing merged CSS file:', err);
-          }
-        });
-        
-        // Send the URL of the cleaned HTML file back to the client  
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          message: 'Your file has been successfully converted!',
-          downloadHtmlUrl: `/output/index-clean-${index + 1}.html`,
-          downloadCssUrl: `/output/merged-styles.css`,
-        }));
-      })
-
+      // Send a single response with file paths
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        message: 'Your files have been successfully converted and saved to the output folder!',
+        files: outputFiles
+      }));
     })
     .catch(err => {
       console.error('Error parsing file:', err);
@@ -186,47 +180,30 @@ const server = http.createServer((req, res) => {
   } else if (req.method === 'POST' && req.url === '/upload') {
     handleFileUpload(req, res);
   } else if (req.method === 'GET' && req.url.startsWith('/src/')) {
-    // Serve static files (CSS, JS, images, etc.)
     const filePath = path.join(__dirname, req.url);
     const ext = path.extname(filePath).toLowerCase();
 
     let contentType = 'text/plain';
     switch (ext) {
-        case '.css':
-            contentType = 'text/css';
-            break;
-        case '.js':
-            contentType = 'application/javascript';
-            break;
-        case '.png':
-            contentType = 'image/png';
-            break;
-        case '.jpg':
-            contentType = 'image/jpeg';
-            break;
-        case '.gif':
-            contentType = 'image/gif';
-            break;
+      case '.css':
+        contentType = 'text/css';
+        break;
+      case '.js':
+        contentType = 'application/javascript';
+        break;
+      case '.png':
+        contentType = 'image/png';
+        break;
+      case '.jpg':
+        contentType = 'image/jpeg';
+        break;
+      case '.gif':
+        contentType = 'image/gif';
+        break;
     }
 
     serveFile(res, filePath, contentType);  
-  } else if (req.method === 'GET' && req.url.startsWith('/output/')) {
-    // Serve output files (cleaned HTML, CSS, etc.)
-    const filePath = path.join(__dirname, req.url);
-    const ext = path.extname(filePath).toLowerCase();
-
-    let contentType = 'text/plain';
-    switch (ext) {
-        case '.html':
-            contentType = 'text/html';
-            break;
-        case '.css':
-            contentType = 'text/css';
-            break;
-    }
-
-    serveFile(res, filePath, contentType);  
-} else {
+  } else {
     res.writeHead(404);
     res.end('404: Not Found');
   }
@@ -235,20 +212,13 @@ const server = http.createServer((req, res) => {
 // Function to convert pt to px
 function convertPtToPx(cssContent) {
   return cssContent.replace(/(\d*\.?\d+)\s*pt/g, (match, p1) => {
-      const ptValue = parseFloat(p1);
-      const pxValue = Math.round(ptValue * 1.333); // Convert pt to px
-      return `${pxValue}px`; // Return the new value with px
+    const ptValue = parseFloat(p1);
+    const pxValue = Math.round(ptValue * 1.333);
+    return `${pxValue}px`;
   });
 }
 
 // Start the server
-// const PORT = 3001;
-// server.listen(PORT, () => {
-//   console.log(`Server is running on http://localhost:${PORT}`);
-//   open(`http://localhost:${PORT}`);
-
-// });
-
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
