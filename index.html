@@ -24,10 +24,10 @@
                 <button id="submitBtn" type="submit">Convert</button>
             </form>
             <div id="message"></div>
-            <div id="downloadLinkContainer" style="display: none;">
+            <!-- <div id="downloadLinkContainer" style="display: none;">
                 <a id="downloadHtmlLink" href="#" download>Download Cleaned HTML</a><br/>
                 <a id="downloadCssLink" href="#" download>Download Merged CSS</a>
-            </div>
+            </div> -->
         </div>
     </div>
 
@@ -62,17 +62,17 @@
                     msg.classList.add("active");
                     // Show the download link
                     if (data.downloadHtmlUrl && data.downloadCssUrl) {
-            console.log("Download URLs received:", data.downloadHtmlUrl, data.downloadCssUrl); // Debug
-            const downloadLinkContainer = document.getElementById('downloadLinkContainer');
-            const downloadHtmlLink = document.getElementById('downloadHtmlLink');
-            const downloadCssLink = document.getElementById('downloadCssLink');
+                        console.log("Download URLs received:", data.downloadHtmlUrl, data.downloadCssUrl); // Debug
+                        const downloadLinkContainer = document.getElementById('downloadLinkContainer');
+                        const downloadHtmlLink = document.getElementById('downloadHtmlLink');
+                        const downloadCssLink = document.getElementById('downloadCssLink');
 
-            downloadHtmlLink.href = data.downloadHtmlUrl;
-            downloadCssLink.href = data.downloadCssUrl;
-            downloadLinkContainer.style.display = 'block';
-        } else {
-            console.log("Download URLs missing in response"); // Debug
-        }
+                        downloadHtmlLink.href = data.downloadHtmlUrl;
+                        downloadCssLink.href = data.downloadCssUrl;
+                        downloadLinkContainer.style.display = 'block';
+                    } else {
+                        console.log("Download URLs missing in response"); // Debug
+                    }
 
                     // Reset button text and state on success
                     convertButton.textContent = 'Convert';
