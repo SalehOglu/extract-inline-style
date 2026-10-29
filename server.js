@@ -219,12 +219,28 @@ function normalizeStyle(styleStr) {
     const prop = decl.substring(0, colonIdx).trim().toLowerCase();
     let val = decl.substring(colonIdx + 1).trim();
 
-    // Convert pt to px accurately (1pt = 96/72px = 1.333333px)
-    val = val.replace(/(\d*\.?\d+)\s*pt\b/gi, (match, p1) => {
-      const ptValue = parseFloat(p1);
-      const pxValue = Math.round((ptValue * 96) / 72);
-      return `${pxValue}px`;
-    });
+    // Convert font-size to relative units (em)
+    if (prop === 'font-size') {
+      // Convert pt to em (standard 12pt = 1em / 16px)
+      val = val.replace(/(\d*\.?\d+)\s*pt\b/gi, (match, p1) => {
+        const pt = parseFloat(p1);
+        const em = +(pt / 12).toFixed(3);
+        return `${em}em`;
+      });
+      // Convert px to em (standard 16px = 1em)
+      val = val.replace(/(\d*\.?\d+)\s*px\b/gi, (match, p1) => {
+        const px = parseFloat(p1);
+        const em = +(px / 16).toFixed(3);
+        return `${em}em`;
+      });
+    } else {
+      // For other dimensions (margin, padding, etc.), convert pt to px
+      val = val.replace(/(\d*\.?\d+)\s*pt\b/gi, (match, p1) => {
+        const ptValue = parseFloat(p1);
+        const pxValue = Math.round((ptValue * 96) / 72);
+        return `${pxValue}px`;
+      });
+    }
 
     val = val.replace(/\s+/g, ' ');
     normalized.push({ prop, val });
