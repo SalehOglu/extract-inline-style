@@ -24,10 +24,10 @@
                 <button id="submitBtn" type="submit">Convert</button>
             </form>
             <div id="message"></div>
-            <!-- <div id="downloadLinkContainer" style="display: none;">
-                <a id="downloadHtmlLink" href="#" download>Download Cleaned HTML</a><br/>
-                <a id="downloadCssLink" href="#" download>Download Merged CSS</a>
-            </div> -->
+            <div id="downloadLinkContainer" style="display: none;">
+                <h3>Converted Files</h3>
+                <div class="file-list" id="fileList"></div>
+            </div>
         </div>
     </div>
 
@@ -36,65 +36,98 @@
             const fileInput = document.getElementById('fileInput');
             const selectedFilesDiv = document.getElementById('selectedFiles');
             const convertButton = document.getElementById('submitBtn');
-
+            const msg = document.getElementById('message');
+            const downloadContainer = document.getElementById('downloadLinkContainer');
+            const fileList = document.getElementById('fileList');
 
             document.getElementById('uploadForm').addEventListener('submit', function(event) {
                 event.preventDefault();
 
                 convertButton.textContent = 'Converting..';
                 convertButton.classList.add("loading");
+                msg.className = '';
+                msg.textContent = '';
+                downloadContainer.style.display = 'none';
+                fileList.innerHTML = '';
 
                 const formData = new FormData();
-
-                // Loop through all selected files and append them to FormData
                 for (let i = 0; i < fileInput.files.length; i++) {
-                    formData.append('files[]', fileInput.files[i]); // Use 'files[]' to indicate multiple files
+                    formData.append('files[]', fileInput.files[i]);
                 }
 
                 fetch('/upload', {
                     method: 'POST',
                     body: formData
                 })
-                .then(response => response.json())
-                .then(data => {
-                    let msg = document.getElementById('message');
-                    msg.textContent = data.message;
-                    msg.classList.add("active");
-                    // Show the download link
-                    if (data.downloadHtmlUrl && data.downloadCssUrl) {
-                        console.log("Download URLs received:", data.downloadHtmlUrl, data.downloadCssUrl); // Debug
-                        const downloadLinkContainer = document.getElementById('downloadLinkContainer');
-                        const downloadHtmlLink = document.getElementById('downloadHtmlLink');
-                        const downloadCssLink = document.getElementById('downloadCssLink');
-
-                        downloadHtmlLink.href = data.downloadHtmlUrl;
-                        downloadCssLink.href = data.downloadCssUrl;
-                        downloadLinkContainer.style.display = 'block';
-                    } else {
-                        console.log("Download URLs missing in response"); // Debug
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(errData => {
+                            throw new Error(errData.message || 'Server error');
+                        });
                     }
+                    return response.json();
+                })
+                .then(data => {
+                    msg.textContent = data.message;
+                    msg.className = 'active';
 
-                    // Reset button text and state on success
-                    convertButton.textContent = 'Convert';
-                    convertButton.classList.remove("loading");
+                    if (data.files && data.files.length > 0) {
+                        data.files.forEach(file => {
+                            const item = document.createElement('div');
+                            item.className = 'file-item';
+
+                            const name = document.createElement('span');
+                            name.className = 'file-item-name';
+                            name.textContent = file.name;
+                            name.title = file.name;
+
+                            const actions = document.createElement('div');
+                            actions.className = 'file-actions';
+
+                            const downloadLink = document.createElement('a');
+                            downloadLink.href = file.url;
+                            downloadLink.download = file.name;
+                            downloadLink.className = 'btn-action btn-download';
+                            downloadLink.textContent = 'Download';
+
+                            const previewLink = document.createElement('a');
+                            previewLink.href = file.url;
+                            previewLink.target = '_blank';
+                            previewLink.className = 'btn-action btn-preview';
+                            previewLink.textContent = 'Preview';
+
+                            actions.appendChild(downloadLink);
+                            actions.appendChild(previewLink);
+
+                            item.appendChild(name);
+                            item.appendChild(actions);
+                            fileList.appendChild(item);
+                        });
+
+                        downloadContainer.style.display = 'block';
+                    }
                 })
                 .catch(error => {
                     console.error('Error:', error);
+                    msg.textContent = 'Error: ' + error.message;
+                    msg.className = 'active error';
+                })
+                .finally(() => {
+                    convertButton.textContent = 'Convert';
+                    convertButton.classList.remove("loading");
                 });
             });
 
             // Update the div to show the selected file names
             fileInput.addEventListener('change', function(event) {
                 const fileNames = Array.from(event.target.files).map(file => file.name).join(', ');
-                selectedFilesDiv.textContent = fileNames || 'No files chosen'; // Update the div with selected file names or reset to default
+                selectedFilesDiv.textContent = fileNames || 'No files chosen';
 
-                // Show the convert button only if files are selected
                 if (fileInput.files.length > 0) {
                     convertButton.style.display = 'block';
                 } else {
                     convertButton.style.display = 'none';
                 }
-                
             });
         });
     </script>
