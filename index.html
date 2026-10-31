@@ -3,17 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" type="image/x-icon" href="/src/imgs/favicon.ico">
-    <link rel="stylesheet" type="text/css" href="/src/css/style.css">
+    <link rel="shortcut icon" type="image/x-icon" href="./src/imgs/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="./src/css/style.css">
     <title>Extract inline style from HTML</title>
 </head>
 <body>
-
     <div class="wrapper">
         <div class="inner">
             <h1>Upload Your HTML Files</h1>
-            <img src="/src/imgs/upload.png" alt="Icon"/>
-            <form id="uploadForm" enctype="multipart/form-data">
+            <img src="./src/imgs/upload.png" alt="Upload Icon"/>
+            <form id="uploadForm">
                 <div class="fileupload">
                     <input type="file" id="fileInput" class="file-input" accept=".html" multiple required/>
                     <label for="fileInput" class="fileLabel">Browse</label>
@@ -32,6 +31,199 @@
     </div>
 
     <script>
+        // --- 1. ENHANCED WINDOWS-1256 MAP ---
+        const WIN_1256_MAP = {
+            0x80: '\u20AC', 0x81: '\u067E', 0x82: '\u201A', 0x83: '\u0192', 
+            0x84: '\u201E', 0x85: '\u2026', 0x86: '\u2020', 0x87: '\u2021',
+            0x88: '\u02C6', 0x89: '\u2030', 0x8A: '\u0679', 0x8B: '\u2039',
+            0x8C: '\u0152', 0x8D: '\u0686', 0x8E: '\u0698', 0x8F: '\u0688',
+            0x90: '\u06AF', 0x91: '\u2018', 0x92: '\u2019', 0x93: '\u201C',
+            0x94: '\u201D', 0x95: '\u2022', 0x96: '\u2013', 0x97: '\u2014',
+            0x98: '\u06A9', 0x99: '\u2122', 0x9A: '\u0691', 0x9B: '\u203A',
+            0x9C: '\u0153', 0x9D: '\u200C', 0x9E: '\u200D', 0x9F: '\u06D2',
+            0xA0: '\u00A0', 0xA1: '\u0660', 0xAB: '\u00AB', 0xBB: '\u00BB',
+            0xC1: '\u0661', 0xC2: '\u0662', 0xC3: '\u0663', 0xC4: '\u0664',
+            0xC5: '\u0665', 0xC6: '\u0666', 0xC7: '\u0667', 0xC8: '\u0668', 0xC9: '\u0669'
+        };
+
+        function decodeHtmlBufferInBrowser(buf) {
+            let offset = 0;
+            if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) offset = 3;
+            const out = [];
+            const len = buf.length;
+            let i = offset;
+            while (i < len) {
+                const b1 = buf[i];
+                if (b1 <= 0x7f) { out.push(String.fromCharCode(b1)); i++; continue; }
+                if (b1 >= 0xc2 && b1 <= 0xdf && i + 1 < len) {
+                    const b2 = buf[i + 1];
+                    if ((b2 & 0xc0) === 0x80) {
+                        const code = ((b1 & 0x1f) << 6) | (b2 & 0x3f);
+                        out.push(String.fromCharCode(code)); i += 2; continue;
+                    }
+                }
+                if (b1 >= 0xe0 && b1 <= 0xef && i + 2 < len) {
+                    const b2 = buf[i + 1]; const b3 = buf[i + 2];
+                    if ((b2 & 0xc0) === 0x80 && (b3 & 0xc0) === 0x80) {
+                        const code = ((b1 & 0x0f) << 12) | ((b2 & 0x3f) << 6) | (b3 & 0x3f);
+                        if (code >= 0x0800 && (code < 0xd800 || code > 0xdfff)) {
+                            out.push(String.fromCharCode(code)); i += 3; continue;
+                        }
+                    }
+                }
+                if (b1 >= 0xf0 && b1 <= 0xf4 && i + 3 < len) {
+                    const b2 = buf[i + 1]; const b3 = buf[i + 2]; const b4 = buf[i + 3];
+                    if ((b2 & 0xc0) === 0x80 && (b3 & 0xc0) === 0x80 && (b4 & 0xc0) === 0x80) {
+                        const code = ((b1 & 0x07) << 18) | ((b2 & 0x3f) << 12) | ((b3 & 0x3f) << 6) | (b4 & 0x3f);
+                        if (code >= 0x10000 && code <= 0x10ffff) {
+                            out.push(String.fromCodePoint(code)); i += 4; continue;
+                        }
+                    }
+                }
+                if (WIN_1256_MAP[b1]) { out.push(WIN_1256_MAP[b1]); i++; continue; }
+                out.push(String.fromCharCode(b1)); i++;
+            }
+            return out.join('');
+        }
+
+        function normalizeStyle(styleStr) {
+            if (!styleStr) return '';
+            const declarations = styleStr.split(';').map(d => d.trim()).filter(Boolean);
+            const normalized = [];
+            for (const decl of declarations) {
+                const colonIdx = decl.indexOf(':');
+                if (colonIdx === -1) continue;
+                const prop = decl.substring(0, colonIdx).trim().toLowerCase();
+                let val = decl.substring(colonIdx + 1).trim();
+                if (prop === 'font-size') {
+                    val = val.replace(/(\d*\.?\d+)\s*pt\b/gi, (_, p1) => `${+(parseFloat(p1)/12).toFixed(3)}em`);
+                    val = val.replace(/(\d*\.?\d+)\s*px\b/gi, (_, p1) => `${+(parseFloat(p1)/16).toFixed(3)}em`);
+                } else {
+                    val = val.replace(/(\d*\.?\d+)\s*pt\b/gi, (_, p1) => `${Math.round((parseFloat(p1)*96)/72)}px`);
+                }
+                val = val.replace(/\s+/g, ' ');
+                normalized.push({ prop, val });
+            }
+            normalized.sort((a, b) => a.prop.localeCompare(b.prop));
+            return normalized.map(d => `${d.prop}:${d.val}`).join(';');
+        }
+
+        function areAttributesEqual(el1, el2) {
+            const att1 = el1.attributes, att2 = el2.attributes;
+            if (att1.length !== att2.length) return false;
+            for (let i = 0; i < att1.length; i++) {
+                const name = att1[i].name;
+                if (name === 'id') return false;
+                if (name === 'style') {
+                    if (normalizeStyle(att1[i].value) !== normalizeStyle(att2[i].value)) return false;
+                } else if (att1[i].value !== att2[i].value) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function processHtmlInBrowser(htmlString, cssFileName) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlString, 'text/html');
+            // Preserve Word-generated whitespace-only spans.
+            // Convert them into text nodes before empty-element cleanup.
+
+            doc.querySelectorAll('span').forEach(el => {
+
+                if (
+                    el.children.length === 0 &&
+                    /^[\s\u00A0]+$/.test(el.textContent)
+                ) {
+                    el.replaceWith(
+                        doc.createTextNode('\u00A0')
+                    );
+                }
+
+            });
+
+            const stylesMap = new Map();
+            let classCounter = 1;
+
+            // 1. Remove empty inline formatting tags
+            ['SPAN', 'B', 'I', 'U', 'STRONG', 'EM', 'FONT', 'SMALL', 'BIG'].forEach(tag => {
+                doc.querySelectorAll(tag).forEach(el => {
+                    if (el.id || el.getAttribute('name')) return;
+                    if (
+                        el.children.length === 0 &&
+                        el.textContent.length === 0
+                    ) {
+                        el.remove();
+                    }
+                });
+            });
+
+            // 2. Merge adjacent spans (EXTREMELY CONSERVATIVE FOR RTL)
+            // We ONLY merge if the VERY NEXT node is a span with identical attributes.
+            // If there is ANY text node (even a single space or newline) between them, we STOP.
+            // This prevents breaking RTL text ordering.
+            doc.querySelectorAll('span').forEach(current => {
+                if (!current.parentNode) return;
+                let next = current.nextSibling;
+                
+                // Strict check: next must be an ELEMENT (nodeType 1), must be a SPAN, and must have equal attributes.
+                // If next is a TEXT node (nodeType 3), the loop immediately stops.
+                while (next && next.nodeType === 1 && next.tagName === 'SPAN' && areAttributesEqual(current, next)) {
+                    while (next.firstChild) {
+                        current.appendChild(next.firstChild);
+                    }
+                    const toRemove = next;
+                    next = toRemove.nextSibling;
+                    toRemove.remove();
+                }
+            });
+
+            // 3. Extract inline styles to classes
+            doc.querySelectorAll('[style]').forEach(el => {
+                const rawStyle = el.getAttribute('style');
+                if (!rawStyle || !rawStyle.trim()) { el.removeAttribute('style'); return; }
+                const canonicalKey = normalizeStyle(rawStyle);
+                if (!canonicalKey) { el.removeAttribute('style'); return; }
+                
+                let className = stylesMap.get(canonicalKey);
+                if (!className) {
+                    className = `class-${classCounter++}`;
+                    stylesMap.set(canonicalKey, className);
+                }
+                el.removeAttribute('style');
+                el.classList.add(className);
+            });
+
+            // 4. Ensure charset and inject CSS
+            let head = doc.querySelector('head');
+            if (!head) { head = doc.createElement('head'); doc.documentElement.prepend(head); }
+            
+            let metaCharset = head.querySelector('meta[charset]');
+            if (metaCharset) metaCharset.setAttribute('charset', 'UTF-8');
+            else head.insertAdjacentHTML('afterbegin', '<meta charset="UTF-8">\n');
+
+            head.querySelectorAll('style').forEach(s => s.remove());
+
+            let cssContent = '/* Extracted and Merged Styles */\n';
+            stylesMap.forEach((className, canonicalKey) => {
+                const formatted = canonicalKey.split(';').map(d => {
+                    const idx = d.indexOf(':');
+                    return `${d.substring(0, idx)}: ${d.substring(idx + 1)}`;
+                }).join('; ');
+                cssContent += `.${className} { ${formatted}; }\n`;
+            });
+
+            const styleTag = doc.createElement('style');
+            styleTag.textContent = cssContent;
+            head.appendChild(styleTag);
+
+            return { 
+                html: '<!DOCTYPE html>\n' + doc.documentElement.outerHTML, 
+                css: cssContent 
+            };
+        }
+
+        // --- UI EVENT LISTENERS ---
         document.addEventListener('DOMContentLoaded', function() {
             const fileInput = document.getElementById('fileInput');
             const selectedFilesDiv = document.getElementById('selectedFiles');
@@ -42,7 +234,6 @@
 
             document.getElementById('uploadForm').addEventListener('submit', function(event) {
                 event.preventDefault();
-
                 convertButton.textContent = 'Converting..';
                 convertButton.classList.add("loading");
                 msg.className = '';
@@ -50,84 +241,76 @@
                 downloadContainer.style.display = 'none';
                 fileList.innerHTML = '';
 
-                const formData = new FormData();
-                for (let i = 0; i < fileInput.files.length; i++) {
-                    formData.append('files[]', fileInput.files[i]);
-                }
+                const files = Array.from(fileInput.files);
+                if (files.length === 0) return;
 
-                fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(errData => {
-                            throw new Error(errData.message || 'Server error');
-                        });
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    msg.textContent = data.message;
-                    msg.className = 'active';
+                let processedCount = 0;
+                
+                files.forEach((file) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const buffer = new Uint8Array(e.target.result);
+                            const htmlString = decodeHtmlBufferInBrowser(buffer);
+                            const result = processHtmlInBrowser(htmlString);
+                            
+                            const blob = new Blob([result.html], { type: 'text/html;charset=utf-8' });
+                            const url = URL.createObjectURL(blob);
+                            const cleanName = file.name.replace(/\.html$/i, '') + '-clean.html';
 
-                    if (data.files && data.files.length > 0) {
-                        data.files.forEach(file => {
                             const item = document.createElement('div');
                             item.className = 'file-item';
-
-                            const name = document.createElement('span');
-                            name.className = 'file-item-name';
-                            name.textContent = file.name;
-                            name.title = file.name;
-
+                            
+                            const nameSpan = document.createElement('span');
+                            nameSpan.className = 'file-item-name';
+                            nameSpan.textContent = cleanName;
+                            nameSpan.title = cleanName;
+                            
                             const actions = document.createElement('div');
                             actions.className = 'file-actions';
+                            
+                            const dlLink = document.createElement('a');
+                            dlLink.href = url;
+                            dlLink.download = cleanName;
+                            dlLink.className = 'btn-action btn-download';
+                            dlLink.textContent = 'Download';
+                            
+                            const prevLink = document.createElement('a');
+                            prevLink.href = url;
+                            prevLink.target = '_blank';
+                            prevLink.className = 'btn-action btn-preview';
+                            prevLink.textContent = 'Preview';
 
-                            const downloadLink = document.createElement('a');
-                            downloadLink.href = file.url;
-                            downloadLink.download = file.name;
-                            downloadLink.className = 'btn-action btn-download';
-                            downloadLink.textContent = 'Download';
-
-                            const previewLink = document.createElement('a');
-                            previewLink.href = file.url;
-                            previewLink.target = '_blank';
-                            previewLink.className = 'btn-action btn-preview';
-                            previewLink.textContent = 'Preview';
-
-                            actions.appendChild(downloadLink);
-                            actions.appendChild(previewLink);
-
-                            item.appendChild(name);
+                            actions.appendChild(dlLink);
+                            actions.appendChild(prevLink);
+                            item.appendChild(nameSpan);
                             item.appendChild(actions);
                             fileList.appendChild(item);
-                        });
 
-                        downloadContainer.style.display = 'block';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    msg.textContent = 'Error: ' + error.message;
-                    msg.className = 'active error';
-                })
-                .finally(() => {
-                    convertButton.textContent = 'Convert';
-                    convertButton.classList.remove("loading");
+                            processedCount++;
+                            if (processedCount === files.length) {
+                                msg.textContent = 'All files successfully converted!';
+                                msg.className = 'active';
+                                downloadContainer.style.display = 'block';
+                                convertButton.textContent = 'Convert';
+                                convertButton.classList.remove("loading");
+                            }
+                        } catch (err) {
+                            console.error(err);
+                            msg.textContent = `Error processing ${file.name}: ${err.message}`;
+                            msg.className = 'active error';
+                            convertButton.textContent = 'Convert';
+                            convertButton.classList.remove("loading");
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
                 });
             });
 
-            // Update the div to show the selected file names
             fileInput.addEventListener('change', function(event) {
-                const fileNames = Array.from(event.target.files).map(file => file.name).join(', ');
+                const fileNames = Array.from(event.target.files).map(f => f.name).join(', ');
                 selectedFilesDiv.textContent = fileNames || 'No files chosen';
-
-                if (fileInput.files.length > 0) {
-                    convertButton.style.display = 'block';
-                } else {
-                    convertButton.style.display = 'none';
-                }
+                convertButton.style.display = fileInput.files.length > 0 ? 'block' : 'none';
             });
         });
     </script>

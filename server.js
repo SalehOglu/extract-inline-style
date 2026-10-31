@@ -273,99 +273,219 @@ function areAttributesEqual(el1, el2) {
 }
 
 // Process HTML: safe empty element cleanup, strict adjacent span merging, style extraction
+// Process HTML: preserve whitespace, clean empty elements,
+// merge adjacent spans, extract inline styles, and generate CSS.
+
 function processHtmlContent(html, stylesMap, classCounterRef) {
-  const $ = cheerio.load(html, { decodeEntities: false });
 
-  // 1. Remove ONLY empty inline formatting tags with no children and no id/name
-  // Never touches void elements (br, hr, img), structure (head, p, table), or bookmarks
-  $('span, b, i, u, strong, em, font, small, big').each(function () {
-    const el = this;
-    if (el.attribs && (el.attribs.id || el.attribs.name)) return;
-    if (el.children && el.children.length > 0) {
-      const hasContent = el.children.some(child => {
-        if (child.type === 'tag') return true;
-        if (child.type === 'text' && child.data && child.data.trim().length > 0) return true;
-        return false;
-      });
-      if (hasContent) return;
-    }
-    $(this).remove();
-  });
+    // 1. Parse HTML
+    const $ = cheerio.load(html, {
+        decodeEntities: true
+    });
 
-  // 2. Merge STRICTLY adjacent <span> tags with identical attributes
-  // IMPORTANT: We inspect current.next (the immediate next DOM node).
-  // If there is ANY text node or another element in between, it will NEVER merge.
+
+  // 2. Preserve Word-generated whitespace-only spans.
+  // Replace Word spacer spans with a NON-BREAKING SPACE.
+  // This prevents HTML cleanup from collapsing the space.
+
   $('span').each(function () {
-    const current = this;
-    if (!current.parent) return;
 
-    let next = current.next;
-    while (
-      next &&
-      next.type === 'tag' &&
-      next.name === 'span' &&
-      areAttributesEqual(current, next)
-    ) {
-      const $current = $(current);
-      const $next = $(next);
-      $current.append($next.contents());
-      const toRemove = next;
-      next = next.next;
-      $(toRemove).remove();
-    }
+      const text = $(this).text();
+
+      if (/^[\s\u00A0]+$/.test(text)) {
+
+          // Replace the spacer span with a non-breaking space.
+          $(this).replaceWith('\u00A0');
+
+      }
+
   });
 
-  // 3. Extract inline styles and convert to deduplicated classes
-  $('[style]').each(function () {
-    const rawStyle = $(this).attr('style');
-    if (!rawStyle || !rawStyle.trim()) {
-      $(this).removeAttr('style');
-      return;
+  console.warn(
+    'HTML after whitespace preservation:',
+    $('p').first().html()
+    );
+
+    // 3. Merge adjacent spans with identical attributes.
+    // Never merge spans across whitespace, including NBSP.
+
+    $('span').each(function () {
+
+        const current = this;
+
+        if (!current.parent) return;
+
+        let next = current.next;
+
+        while (
+            next &&
+            next.type === 'tag' &&
+            next.name === 'span' &&
+            areAttributesEqual(current, next)
+        ) {
+
+            // Safety check: never merge if whitespace exists
+            // between the current and next span.
+            const between = current.next;
+
+            if (
+                between &&
+                between.type === 'text' &&
+                /^[\s\u00A0]*$/.test(between.data)
+            ) {
+                break;
+            }
+
+            $(current).append($(next).contents());
+
+            const toRemove = next;
+            next = next.next;
+
+            $(toRemove).remove();
+
+        }
+
+    });
+
+    // 4. Merge strictly adjacent spans with identical attributes
+    // These spans must remain separate because a text node
+    // exists between them.
+
+    $('span').each(function () {
+
+        const current = this;
+
+        if (!current.parent) {
+            return;
+        }
+
+        let next = current.next;
+
+        while (
+            next &&
+            next.type === 'tag' &&
+            next.name === 'span' &&
+            areAttributesEqual(current, next)
+        ) {
+
+            const $current = $(current);
+            const $next = $(next);
+
+            // Move the next span's contents into the current span.
+            $current.append($next.contents());
+
+            // Save the next sibling before removing the element.
+            const toRemove = next;
+
+            next = next.next;
+
+            // Remove the merged span.
+            $(toRemove).remove();
+
+        }
+
+    });
+
+    // Identical styles receive the same CSS class.
+    // Inline styles are removed from the HTML.
+
+    $('[style]').each(function () {
+
+        const rawStyle = $(this).attr('style');
+
+        // Remove empty style attributes.
+        if (!rawStyle || !rawStyle.trim()) {
+
+            $(this).removeAttr('style');
+
+            return;
+
+        }
+
+        // Normalize the style for comparison and deduplication.
+        const canonicalKey = normalizeStyle(rawStyle);
+
+        // Remove invalid or empty normalized styles.
+        if (!canonicalKey) {
+
+            $(this).removeAttr('style');
+
+            return;
+
+        }
+
+        let className;
+
+        // Reuse an existing class if the style already exists.
+        if (stylesMap.has(canonicalKey)) {
+
+            className = stylesMap.get(canonicalKey);
+
+        } else {
+
+            // Generate a new class.
+            className = `class-${classCounterRef.counter++}`;
+
+            stylesMap.set(canonicalKey, className);
+
+        }
+
+        // Remove inline style and assign the generated class.
+        $(this)
+            .removeAttr('style')
+            .addClass(className);
+
+    });
+
+    let head = $('head');
+
+    // Create <head> if missing.
+    if (!head.length) {
+
+        head = $('<head></head>').prependTo('html');
+
     }
 
-    const canonicalKey = normalizeStyle(rawStyle);
-    if (!canonicalKey) {
-      $(this).removeAttr('style');
-      return;
-    }
+    const metaCharset = head.find('meta[charset]');
 
-    let className;
-    if (stylesMap.has(canonicalKey)) {
-      className = stylesMap.get(canonicalKey);
+    const metaHttpEquiv = head.find(
+        'meta[http-equiv="Content-Type" i]'
+    );
+
+    // Update existing charset declaration.
+    if (metaCharset.length) {
+
+        metaCharset.attr('charset', 'UTF-8');
+
+    } else if (metaHttpEquiv.length) {
+
+        // Update existing Content-Type declaration.
+        metaHttpEquiv.attr(
+            'content',
+            'text/html; charset=UTF-8'
+        );
+
     } else {
-      className = `class-${classCounterRef.counter++}`;
-      stylesMap.set(canonicalKey, className);
+        head.prepend('<meta charset="UTF-8">\n');
     }
 
-    $(this).removeAttr('style').addClass(className);
-  });
+    head.find('style').remove();
 
-  // 4. Ensure <head> and <meta charset="UTF-8"> exist
-  let head = $('head');
-  if (!head.length) {
-    head = $('<head></head>').prependTo('html');
-  }
+    const mergedCssFileName = 'merged-styles.css';
 
-  const metaCharset = head.find('meta[charset]');
-  const metaHttpEquiv = head.find('meta[http-equiv="Content-Type" i]');
-  if (metaCharset.length) {
-    metaCharset.attr('charset', 'UTF-8');
-  } else if (metaHttpEquiv.length) {
-    metaHttpEquiv.attr('content', 'text/html; charset=UTF-8');
-  } else {
-    head.prepend('<meta charset="UTF-8">\n');
-  }
+    // Avoid adding duplicate stylesheet links.
+    if (
+        !head.find(`link[href="${mergedCssFileName}"]`).length
+    ) {
 
-  // Remove existing <style> tags from head
-  head.find('style').remove();
+        head.append(
+            `<link rel="stylesheet" href="${mergedCssFileName}">\n`
+        );
 
-  // Add stylesheet link if not already present
-  const mergedCssFileName = 'merged-styles.css';
-  if (!head.find(`link[href="${mergedCssFileName}"]`).length) {
-    head.append(`<link rel="stylesheet" href="${mergedCssFileName}">\n`);
-  }
+    }
+    
+    return $.html();
 
-  return $.html();
 }
 
 // Handle file uploads and processing
@@ -543,6 +663,7 @@ server.on('error', err => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running at http://localhost:${PORT}`);
+  
   // ONLY open the browser if you are running this on your own computer
   if (process.env.NODE_ENV !== 'production') {
     open(`http://localhost:${PORT}`).catch(() => {});
