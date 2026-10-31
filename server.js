@@ -404,7 +404,7 @@ function handleFileUpload(req, res) {
 
         outputFiles.push({
           name: outputName,
-          url: `/output/${outputName}`,
+          url: `/output/${encodeURIComponent(outputName)}`,
           type: 'html'
         });
       });
@@ -461,15 +461,22 @@ const server = http.createServer((req, res) => {
     handleFileUpload(req, res);
   } else if (req.method === 'GET' && reqUrl.startsWith('/output/')) {
     // Serve output files securely
-    const filename = path.basename(reqUrl);
-    const filePath = path.join(outputDir, filename);
+    let filename;
+    try {
+      filename = decodeURIComponent(reqUrl.slice('/output/'.length));
+    } catch (err) {
+      res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('400: Invalid file path');
+      return;
+    }
 
-    // Prevent directory traversal
-    if (!filePath.startsWith(outputDir)) {
+    if (!filename || filename !== path.basename(filename) || filename === '.' || filename === '..') {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('403: Forbidden');
       return;
     }
+
+    const filePath = path.join(outputDir, filename);
 
     const ext = path.extname(filePath).toLowerCase();
     let contentType = 'text/plain; charset=utf-8';
@@ -534,7 +541,10 @@ server.on('error', err => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running at http://localhost:${PORT}`);
-  open(`http://localhost:${PORT}`).catch(() => {});
+  // ONLY open the browser if you are running this on your own computer
+  if (process.env.NODE_ENV !== 'production') {
+    open(`http://localhost:${PORT}`).catch(() => {});
+  }
 });
