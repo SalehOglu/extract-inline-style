@@ -280,8 +280,17 @@ function processHtmlContent(html, stylesMap, classCounterRef) {
 
     // 1. Parse HTML
     const $ = cheerio.load(html, {
-        decodeEntities: true
+        decodeEntities: false
     });
+
+    // Collect CSS rules from existing style tags.
+    let extractedCss = '';
+
+    $('style').each((_, element) => {
+      extractedCss += $(element).html() + '\n';
+    });
+
+    $('style').remove();
 
 
   // 2. Preserve Word-generated whitespace-only spans.
@@ -484,7 +493,10 @@ function processHtmlContent(html, stylesMap, classCounterRef) {
 
     }
     
-    return $.html();
+    return {
+      html: $.html(),
+      css: extractedCss
+    };
 
 }
 
@@ -504,11 +516,15 @@ function handleFileUpload(req, res) {
   parseMultipartData(req, boundary.trim())
     .then(files => {
       const stylesMap = new Map();
+      let extractedCssContent = '';
       const classCounterRef = { counter: 1 };
       const outputFiles = [];
 
       files.forEach((fileObj, index) => {
-        const cleanedHtml = processHtmlContent(fileObj.content, stylesMap, classCounterRef);
+        const result = processHtmlContent(fileObj.content, stylesMap, classCounterRef);
+
+        const cleanedHtml = result.html;
+        extractedCssContent += result.css + '\n';
 
         let outputName;
         if (fileObj.filename) {
@@ -529,8 +545,13 @@ function handleFileUpload(req, res) {
         });
       });
 
-      // Build formatted CSS content from stylesMap
+      // Build CSS content from original <style> tags and inline styles.
       let cssContent = '/* Extracted and Merged Styles */\n';
+
+      // Add CSS extracted from original <style> tags.
+      cssContent += extractedCssContent + '\n';
+
+      // Add CSS generated from inline styles.
       stylesMap.forEach((className, canonicalKey) => {
         const formattedProps = canonicalKey
           .split(';')
@@ -539,8 +560,10 @@ function handleFileUpload(req, res) {
             return `${decl.substring(0, colonIdx)}: ${decl.substring(colonIdx + 1)}`;
           })
           .join('; ');
+
         cssContent += `.${className} { ${formattedProps}; }\n`;
       });
+
 
       const mergedCssOutputPath = path.join(outputDir, 'merged-styles.css');
       fs.writeFileSync(mergedCssOutputPath, cssContent, 'utf-8');

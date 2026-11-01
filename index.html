@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" type="image/x-icon" href="./src/imgs/favicon.ico">
     <link rel="stylesheet" type="text/css" href="./src/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <title>Extract inline style from HTML</title>
 </head>
+
 <body>
     <div class="wrapper">
         <div class="inner">
             <h1>Upload Your HTML Files</h1>
-            <img src="./src/imgs/upload.png" alt="Upload Icon"/>
+            <img src="./src/imgs/upload.png" alt="Upload Icon" />
             <form id="uploadForm">
                 <div class="fileupload">
-                    <input type="file" id="fileInput" class="file-input" accept=".html" multiple required/>
+                    <input type="file" id="fileInput" class="file-input" accept=".html" multiple required />
                     <label for="fileInput" class="fileLabel">Browse</label>
                 </div>
                 <div class="selected" id="selectedFiles">
@@ -26,6 +29,9 @@
             <div id="downloadLinkContainer" style="display: none;">
                 <h3>Converted Files</h3>
                 <div class="file-list" id="fileList"></div>
+                <button id="downloadAllBtn" class="btn-action btn-download btn-all" style="display: none;">
+                    Download All
+                </button>
             </div>
         </div>
     </div>
@@ -33,7 +39,7 @@
     <script>
         // --- 1. ENHANCED WINDOWS-1256 MAP ---
         const WIN_1256_MAP = {
-            0x80: '\u20AC', 0x81: '\u067E', 0x82: '\u201A', 0x83: '\u0192', 
+            0x80: '\u20AC', 0x81: '\u067E', 0x82: '\u201A', 0x83: '\u0192',
             0x84: '\u201E', 0x85: '\u2026', 0x86: '\u2020', 0x87: '\u2021',
             0x88: '\u02C6', 0x89: '\u2030', 0x8A: '\u0679', 0x8B: '\u2039',
             0x8C: '\u0152', 0x8D: '\u0686', 0x8E: '\u0698', 0x8F: '\u0688',
@@ -96,10 +102,10 @@
                 const prop = decl.substring(0, colonIdx).trim().toLowerCase();
                 let val = decl.substring(colonIdx + 1).trim();
                 if (prop === 'font-size') {
-                    val = val.replace(/(\d*\.?\d+)\s*pt\b/gi, (_, p1) => `${+(parseFloat(p1)/12).toFixed(3)}em`);
-                    val = val.replace(/(\d*\.?\d+)\s*px\b/gi, (_, p1) => `${+(parseFloat(p1)/16).toFixed(3)}em`);
+                    val = val.replace(/(\d*\.?\d+)\s*pt\b/gi, (_, p1) => `${+(parseFloat(p1) / 12).toFixed(3)}em`);
+                    val = val.replace(/(\d*\.?\d+)\s*px\b/gi, (_, p1) => `${+(parseFloat(p1) / 16).toFixed(3)}em`);
                 } else {
-                    val = val.replace(/(\d*\.?\d+)\s*pt\b/gi, (_, p1) => `${Math.round((parseFloat(p1)*96)/72)}px`);
+                    val = val.replace(/(\d*\.?\d+)\s*pt\b/gi, (_, p1) => `${Math.round((parseFloat(p1) * 96) / 72)}px`);
                 }
                 val = val.replace(/\s+/g, ' ');
                 normalized.push({ prop, val });
@@ -123,108 +129,122 @@
             return true;
         }
 
-        function processHtmlInBrowser(htmlString, cssFileName) {
+
+        function processHtmlInBrowser(htmlString, stylesMap, classCounterRef, cssAccumulator) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(htmlString, 'text/html');
+
+            // Extract original CSS from style tags and remove the tags.
+            doc.querySelectorAll('style').forEach(style => {
+                cssAccumulator.push(style.textContent);
+                style.remove();
+            });
+
             // Preserve Word-generated whitespace-only spans.
-            // Convert them into text nodes before empty-element cleanup.
-
             doc.querySelectorAll('span').forEach(el => {
-
                 if (
                     el.children.length === 0 &&
                     /^[\s\u00A0]+$/.test(el.textContent)
                 ) {
-                    el.replaceWith(
-                        doc.createTextNode('\u00A0')
-                    );
+                    el.replaceWith(doc.createTextNode('\u00A0'));
                 }
-
             });
 
-            const stylesMap = new Map();
-            let classCounter = 1;
-
-            // 1. Remove empty inline formatting tags
+            // Remove empty inline formatting tags.
             ['SPAN', 'B', 'I', 'U', 'STRONG', 'EM', 'FONT', 'SMALL', 'BIG'].forEach(tag => {
                 doc.querySelectorAll(tag).forEach(el => {
                     if (el.id || el.getAttribute('name')) return;
-                    if (
-                        el.children.length === 0 &&
-                        el.textContent.length === 0
-                    ) {
+
+                    if (el.children.length === 0 && el.textContent.length === 0) {
                         el.remove();
                     }
                 });
             });
 
-            // 2. Merge adjacent spans (EXTREMELY CONSERVATIVE FOR RTL)
-            // We ONLY merge if the VERY NEXT node is a span with identical attributes.
-            // If there is ANY text node (even a single space or newline) between them, we STOP.
-            // This prevents breaking RTL text ordering.
+            // Merge adjacent spans with identical attributes.
             doc.querySelectorAll('span').forEach(current => {
                 if (!current.parentNode) return;
+
                 let next = current.nextSibling;
-                
-                // Strict check: next must be an ELEMENT (nodeType 1), must be a SPAN, and must have equal attributes.
-                // If next is a TEXT node (nodeType 3), the loop immediately stops.
-                while (next && next.nodeType === 1 && next.tagName === 'SPAN' && areAttributesEqual(current, next)) {
+
+                while (
+                    next &&
+                    next.nodeType === 1 &&
+                    next.tagName === 'SPAN' &&
+                    areAttributesEqual(current, next)
+                ) {
                     while (next.firstChild) {
                         current.appendChild(next.firstChild);
                     }
+
                     const toRemove = next;
                     next = toRemove.nextSibling;
                     toRemove.remove();
                 }
             });
 
-            // 3. Extract inline styles to classes
+            // Extract inline styles into shared CSS classes.
             doc.querySelectorAll('[style]').forEach(el => {
                 const rawStyle = el.getAttribute('style');
-                if (!rawStyle || !rawStyle.trim()) { el.removeAttribute('style'); return; }
+
+                if (!rawStyle || !rawStyle.trim()) {
+                    el.removeAttribute('style');
+                    return;
+                }
+
                 const canonicalKey = normalizeStyle(rawStyle);
-                if (!canonicalKey) { el.removeAttribute('style'); return; }
-                
+
+                if (!canonicalKey) {
+                    el.removeAttribute('style');
+                    return;
+                }
+
                 let className = stylesMap.get(canonicalKey);
+
                 if (!className) {
-                    className = `class-${classCounter++}`;
+                    className = `class-${classCounterRef.counter++}`;
                     stylesMap.set(canonicalKey, className);
                 }
+
                 el.removeAttribute('style');
                 el.classList.add(className);
             });
 
-            // 4. Ensure charset and inject CSS
+            // Ensure UTF-8 charset.
             let head = doc.querySelector('head');
-            if (!head) { head = doc.createElement('head'); doc.documentElement.prepend(head); }
-            
+
+            if (!head) {
+                head = doc.createElement('head');
+                doc.documentElement.prepend(head);
+            }
+
             let metaCharset = head.querySelector('meta[charset]');
-            if (metaCharset) metaCharset.setAttribute('charset', 'UTF-8');
-            else head.insertAdjacentHTML('afterbegin', '<meta charset="UTF-8">\n');
 
-            head.querySelectorAll('style').forEach(s => s.remove());
+            if (metaCharset) {
+                metaCharset.setAttribute('charset', 'UTF-8');
+            } else {
+                head.insertAdjacentHTML('afterbegin', '<meta charset="UTF-8">');
+            }
 
-            let cssContent = '/* Extracted and Merged Styles */\n';
-            stylesMap.forEach((className, canonicalKey) => {
-                const formatted = canonicalKey.split(';').map(d => {
-                    const idx = d.indexOf(':');
-                    return `${d.substring(0, idx)}: ${d.substring(idx + 1)}`;
-                }).join('; ');
-                cssContent += `.${className} { ${formatted}; }\n`;
+            // Remove any previous extracted stylesheet reference.
+            head.querySelectorAll('link[data-extracted-stylesheet]').forEach(link => {
+                link.remove();
             });
 
-            const styleTag = doc.createElement('style');
-            styleTag.textContent = cssContent;
-            head.appendChild(styleTag);
+            // Reference the ONE shared external CSS file.
+            const cssLink = doc.createElement('link');
+            cssLink.rel = 'stylesheet';
+            cssLink.href = 'merged-styles.css';
+            cssLink.setAttribute('data-extracted-stylesheet', 'true');
 
-            return { 
-                html: '<!DOCTYPE html>\n' + doc.documentElement.outerHTML, 
-                css: cssContent 
-            };
+            head.appendChild(cssLink);
+
+            return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
         }
 
+
         // --- UI EVENT LISTENERS ---
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const fileInput = document.getElementById('fileInput');
             const selectedFilesDiv = document.getElementById('selectedFiles');
             const convertButton = document.getElementById('submitBtn');
@@ -232,7 +252,7 @@
             const downloadContainer = document.getElementById('downloadLinkContainer');
             const fileList = document.getElementById('fileList');
 
-            document.getElementById('uploadForm').addEventListener('submit', function(event) {
+            document.getElementById('uploadForm').addEventListener('submit', function (event) {
                 event.preventDefault();
                 convertButton.textContent = 'Converting..';
                 convertButton.classList.add("loading");
@@ -240,61 +260,193 @@
                 msg.textContent = '';
                 downloadContainer.style.display = 'none';
                 fileList.innerHTML = '';
+                const downloadAllBtn = document.getElementById('downloadAllBtn');
+                downloadAllBtn.style.display = 'none';
+                downloadAllBtn.disabled = false;
+                downloadAllBtn.textContent = 'Download All';
 
                 const files = Array.from(fileInput.files);
                 if (files.length === 0) return;
 
                 let processedCount = 0;
-                
+                const processedItems = [];
+
+                // Shared data for ALL uploaded HTML files.
+                const sharedStylesMap = new Map();
+                const classCounterRef = { counter: 1 };
+                const cssAccumulator = [];
+
                 files.forEach((file) => {
                     const reader = new FileReader();
-                    reader.onload = function(e) {
+                    reader.onload = function (e) {
                         try {
                             const buffer = new Uint8Array(e.target.result);
                             const htmlString = decodeHtmlBufferInBrowser(buffer);
-                            const result = processHtmlInBrowser(htmlString);
-                            
-                            const blob = new Blob([result.html], { type: 'text/html;charset=utf-8' });
-                            const url = URL.createObjectURL(blob);
+
+                            const cleanedHtml = processHtmlInBrowser(
+                                htmlString,
+                                sharedStylesMap,
+                                classCounterRef,
+                                cssAccumulator
+                            );
+
+                            // HTML file
+                            const htmlBlob = new Blob(
+                                [cleanedHtml],
+                                { type: 'text/html;charset=utf-8' }
+                            );
+
+                            const htmlUrl = URL.createObjectURL(htmlBlob);
+
                             const cleanName = file.name.replace(/\.html$/i, '') + '-clean.html';
+
+                            processedItems.push({
+                                fileName: cleanName,
+                                cleanedHtml: cleanedHtml
+                            });
 
                             const item = document.createElement('div');
                             item.className = 'file-item';
-                            
+
                             const nameSpan = document.createElement('span');
                             nameSpan.className = 'file-item-name';
                             nameSpan.textContent = cleanName;
                             nameSpan.title = cleanName;
-                            
+
                             const actions = document.createElement('div');
                             actions.className = 'file-actions';
-                            
+
                             const dlLink = document.createElement('a');
-                            dlLink.href = url;
+                            dlLink.href = htmlUrl;
                             dlLink.download = cleanName;
                             dlLink.className = 'btn-action btn-download';
                             dlLink.textContent = 'Download';
-                            
+
                             const prevLink = document.createElement('a');
-                            prevLink.href = url;
+                            prevLink.href = htmlUrl;
                             prevLink.target = '_blank';
                             prevLink.className = 'btn-action btn-preview';
                             prevLink.textContent = 'Preview';
 
                             actions.appendChild(dlLink);
                             actions.appendChild(prevLink);
+
                             item.appendChild(nameSpan);
                             item.appendChild(actions);
                             fileList.appendChild(item);
 
                             processedCount++;
+
                             if (processedCount === files.length) {
+
+                                // Generate ONE CSS file for ALL uploaded HTML files.
+                                let cssContent = '/* Extracted and Merged Styles */\n';
+
+                                // Original CSS from all uploaded files.
+                                cssContent += cssAccumulator.join('\n') + '\n';
+
+                                // Generated CSS from inline styles.
+                                sharedStylesMap.forEach((className, canonicalKey) => {
+                                    const formatted = canonicalKey.split(';').map(decl => {
+                                        const idx = decl.indexOf(':');
+                                        return `${decl.substring(0, idx)}: ${decl.substring(idx + 1)}`;
+                                    }).join('; ');
+
+                                    cssContent += `.${className} { ${formatted}; }\n`;
+                                });
+
+                                // Create one shared CSS download.
+                                const cssBlob = new Blob(
+                                    [cssContent],
+                                    { type: 'text/css;charset=utf-8' }
+                                );
+
+                                const cssUrl = URL.createObjectURL(cssBlob);
+
+                                const cssItem = document.createElement('div');
+                                cssItem.className = 'file-item';
+
+                                const cssName = document.createElement('span');
+                                cssName.className = 'file-item-name';
+                                cssName.textContent = 'merged-styles.css';
+
+                                const cssActions = document.createElement('div');
+                                cssActions.className = 'file-actions';
+
+                                const cssDownload = document.createElement('a');
+                                cssDownload.href = cssUrl;
+                                cssDownload.download = 'merged-styles.css';
+                                cssDownload.className = 'btn-action btn-download';
+                                cssDownload.textContent = 'Download CSS';
+
+                                cssActions.appendChild(cssDownload);
+                                cssItem.appendChild(cssName);
+                                cssItem.appendChild(cssActions);
+
+                                fileList.appendChild(cssItem);
+
+                                const downloadAllBtn = document.getElementById('downloadAllBtn');
+
+                                downloadAllBtn.style.display = 'inline-block';
+
+                                downloadAllBtn.onclick = async function () {
+                                    try {
+                                        downloadAllBtn.disabled = true;
+                                        downloadAllBtn.textContent = 'Preparing ZIP...';
+
+                                        const zip = new JSZip();
+                                        // const outputFolder = zip.folder('converted-files');
+
+                                        // Add all converted HTML files.
+                                        processedItems.forEach(item => {
+                                            zip.file(item.fileName, item.cleanedHtml);
+                                        });
+
+                                        // processedItems.forEach(item => {
+                                        // outputFolder.file(item.fileName, item.cleanedHtml);
+                                        // });
+
+                                        // outputFolder.file('merged-styles.css', cssContent);
+
+                                        // Add the shared CSS file once.
+                                        zip.file('merged-styles.css', cssContent);
+
+                                        // Generate ZIP.
+                                        const zipBlob = await zip.generateAsync({
+                                            type: 'blob'
+                                        });
+
+                                        const zipUrl = URL.createObjectURL(zipBlob);
+
+                                        const link = document.createElement('a');
+                                        link.href = zipUrl;
+                                        link.download = 'converted-files.zip';
+
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        link.remove();
+
+                                        setTimeout(() => URL.revokeObjectURL(zipUrl), 1000);
+
+                                    } catch (error) {
+                                        console.error('ZIP generation failed:', error);
+                                        alert('Could not generate the ZIP file: ' + error.message);
+
+                                    } finally {
+                                        downloadAllBtn.disabled = false;
+                                        downloadAllBtn.textContent = 'Download All';
+                                    }
+                                };
+
+
                                 msg.textContent = 'All files successfully converted!';
                                 msg.className = 'active';
                                 downloadContainer.style.display = 'block';
+
                                 convertButton.textContent = 'Convert';
                                 convertButton.classList.remove("loading");
                             }
+
                         } catch (err) {
                             console.error(err);
                             msg.textContent = `Error processing ${file.name}: ${err.message}`;
@@ -307,7 +459,7 @@
                 });
             });
 
-            fileInput.addEventListener('change', function(event) {
+            fileInput.addEventListener('change', function (event) {
                 const fileNames = Array.from(event.target.files).map(f => f.name).join(', ');
                 selectedFilesDiv.textContent = fileNames || 'No files chosen';
                 convertButton.style.display = fileInput.files.length > 0 ? 'block' : 'none';
@@ -315,4 +467,5 @@
         });
     </script>
 </body>
+
 </html>

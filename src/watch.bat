@@ -1,1 +1,1 @@
-node-sass --watch scss -o css
+npx sass --watch scss:css

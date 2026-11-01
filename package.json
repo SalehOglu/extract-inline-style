@@ -16,5 +16,8 @@
     "nodemon": "^3.1.9",
     "open": "^7.4.2",
     "parse5": "^5.0.0"
+  },
+  "devDependencies": {
+    "sass": "^1.107.1"
   }
 }
